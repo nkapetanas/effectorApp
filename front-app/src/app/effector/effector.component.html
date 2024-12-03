@@ -1,0 +1,99 @@
+<mat-card class="effector-card">
+  <mat-card-header>
+    <mat-card-title>Effector Analysis Dashboard</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    <mat-tab-group [selectedIndex]="dataSource === 'url' ? 0 : 1"
+                   (selectedIndexChange)="dataSource = $event === 0 ? 'url' : 'file'">
+      <mat-tab label="Data from URL">
+        <div class="tab-content">
+          <mat-form-field class="full-width">
+            <mat-label>Data URL</mat-label>
+            <input matInput [(ngModel)]="config.dataUrl"
+                   placeholder="https://api.example.com/data">
+          </mat-form-field>
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Upload Data File">
+        <div class="tab-content">
+          <button mat-stroked-button (click)="dataFileInput.click()">
+            <mat-icon>upload</mat-icon>
+            Choose Data File (JSON/NPY)
+          </button>
+          <input #dataFileInput
+                 type="file"
+                 [accept]="dataAcceptTypes"
+                 hidden
+                 (change)="handleDataFileChange($event)">
+          <span *ngIf="selectedFile" class="ml-2">
+            Data File: {{ selectedFile.file.name }}
+          </span>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+
+    <div class="model-section">
+      <mat-form-field *ngIf="!selectedModel" class="full-width">
+        <mat-label>Model URL</mat-label>
+        <input matInput [(ngModel)]="config.modelUrl"
+               placeholder="https://api.example.com/model">
+      </mat-form-field>
+
+      <div class="model-upload">
+        <button mat-stroked-button (click)="modelFileInput.click()">
+          <mat-icon>upload</mat-icon>
+          Choose Model File (H5/Keras)
+        </button>
+        <input #modelFileInput
+               type="file"
+               [accept]="modelAcceptTypes"
+               hidden
+               (change)="handleModelFileChange($event)">
+        <div *ngIf="selectedModel" class="selected-model">
+          <span>Model File: {{ selectedModel.file.name }}</span>
+          <button mat-icon-button color="warn" (click)="clearModelFile()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <mat-form-field>
+        <mat-label>Analysis Method</mat-label>
+        <mat-select [(ngModel)]="selectedMethod">
+          <mat-option value="pdp">PDP</mat-option>
+          <mat-option value="rhale">RHALE</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>Feature Index</mat-label>
+        <input matInput type="number"
+               [(ngModel)]="featureIndex"
+               min="0">
+      </mat-form-field>
+
+      <button mat-raised-button
+              color="primary"
+              [disabled]="loading || (!config.dataUrl && !selectedFile) || (!config.modelUrl && !selectedModel)"
+              (click)="analyze()">
+        <mat-icon *ngIf="!loading">analytics</mat-icon>
+        <mat-progress-spinner *ngIf="loading"
+                              [mode]="'indeterminate'"
+                              [diameter]="20"
+                              [strokeWidth]="2">
+        </mat-progress-spinner>
+        {{ loading ? 'Analyzing...' : 'Analyze' }}
+      </button>
+    </div>
+
+    <div *ngIf="plotImage" class="plot-container">
+      <img [src]="plotImage"
+           alt="Analysis Plot"
+           class="result-plot">
+    </div>
+  </mat-card-content>
+</mat-card>

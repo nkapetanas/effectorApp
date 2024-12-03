@@ -1,0 +1,61 @@
+
+.effector-card {
+  margin: 24px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.full-width {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.controls-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.tab-content {
+  padding: 16px 0;
+}
+
+.model-section {
+  margin-top: 24px;
+}
+
+.model-upload {
+  margin-top: 16px;
+}
+
+.selected-model {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.plot-container {
+  margin-top: 24px;
+}
+
+.result-plot {
+  width: 100%;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.ml-2 {
+  margin-left: 8px;
+}
+
+mat-progress-spinner {
+  display: inline-block;
+  margin-right: 8px;
+}
+
+mat-card-title {
+  margin-bottom: 0;
+}

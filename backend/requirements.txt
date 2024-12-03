@@ -1,0 +1,7 @@
+flask==2.0.1
+Flask-Cors
+tensorflow==2.9.1
+effector==0.3.0
+matplotlib==3.4.3
+requests==2.26.0
+numpy==1.19.5

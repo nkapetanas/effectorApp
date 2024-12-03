@@ -1,9 +1,0 @@
-flask
-effector
-numpy
-pandas
-scikit-learn
-joblib
-io
-matplotlib
-pytest
