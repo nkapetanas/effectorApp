@@ -66,7 +66,14 @@
         <mat-select [(ngModel)]="selectedMethod">
           <mat-option value="pdp">PDP</mat-option>
           <mat-option value="rhale">RHALE</mat-option>
+          <mat-option value="regional_rhale">Regional RHALE</mat-option>
+          <mat-option value="regional_pdp">Regional PDP</mat-option>
         </mat-select>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>Target Name</mat-label>
+        <input matInput [(ngModel)]="targetName" placeholder="e.g., bike-rentals">
       </mat-form-field>
 
       <mat-form-field>
@@ -74,6 +81,19 @@
         <input matInput type="number"
                [(ngModel)]="featureIndex"
                min="0">
+      </mat-form-field>
+
+      <mat-form-field *ngIf="['regional_rhale', 'regional_pdp'].includes(selectedMethod)">
+        <mat-label>Node Index</mat-label>
+        <input matInput type="number" [(ngModel)]="nodeIdx" min="1">
+      </mat-form-field>
+
+      <mat-form-field *ngIf="['rhale', 'regional_pdp'].includes(selectedMethod)">
+        <mat-label>Heterogeneity</mat-label>
+        <mat-select [(ngModel)]="heterogeneity">
+          <mat-option value="std">Standard Deviation</mat-option>
+          <mat-option value="ice">ICE</mat-option>
+        </mat-select>
       </mat-form-field>
 
       <button mat-raised-button
@@ -90,10 +110,22 @@
       </button>
     </div>
 
-    <div *ngIf="plotImage" class="plot-container">
-      <img [src]="plotImage"
-           alt="Analysis Plot"
-           class="result-plot">
+    <div *ngIf="plotImage" class="results-section">
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>Analysis Results</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <img [src]="plotImage" alt="Analysis Plot" class="result-plot">
+
+          <div *ngIf="partitioningInfo" class="partitioning-info">
+            <h3>Partitioning Information</h3>
+            <pre>{{ partitioningInfo }}</pre>
+          </div>
+        </mat-card-content>
+      </mat-card>
     </div>
   </mat-card-content>
 </mat-card>
+
+
