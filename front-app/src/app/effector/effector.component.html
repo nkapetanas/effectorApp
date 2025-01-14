@@ -20,7 +20,7 @@
         <div class="tab-content">
           <button mat-stroked-button (click)="dataFileInput.click()">
             <mat-icon>upload</mat-icon>
-            Choose Data File (JSON/NPY)
+            Choose Data File (JSON/NPY/CSV)
           </button>
           <input #dataFileInput
                  type="file"
@@ -44,7 +44,7 @@
       <div class="model-upload">
         <button mat-stroked-button (click)="modelFileInput.click()">
           <mat-icon>upload</mat-icon>
-          Choose Model File (H5/Keras)
+          Choose Model File (H5/Keras/PKL)
         </button>
         <input #modelFileInput
                type="file"
@@ -110,20 +110,20 @@
       </button>
     </div>
 
-    <div *ngIf="plotImage" class="results-section">
-      <mat-card>
-        <mat-card-header>
-          <mat-card-title>Analysis Results</mat-card-title>
-        </mat-card-header>
-        <mat-card-content>
-          <img [src]="plotImage" alt="Analysis Plot" class="result-plot">
+    <!-- Results display -->
+    <div *ngIf="plotImage || partitioningInfo" class="results-section">
+      <div *ngIf="plotImage" class="plot-container">
+        <h3>Analysis Result</h3>
+        <img [src]="plotImage"
+             alt="Analysis Plot"
+             class="result-plot"
+             >
+      </div>
 
-          <div *ngIf="partitioningInfo" class="partitioning-info">
-            <h3>Partitioning Information</h3>
-            <pre>{{ partitioningInfo }}</pre>
-          </div>
-        </mat-card-content>
-      </mat-card>
+      <div *ngIf="partitioningInfo" class="partitioning-info">
+        <h3>Partitioning Information</h3>
+        <pre>{{ partitioningInfo }}</pre>
+      </div>
     </div>
   </mat-card-content>
 </mat-card>

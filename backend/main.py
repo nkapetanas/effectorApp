@@ -86,16 +86,33 @@ def analyze_data():
     try:
         data_fetcher = DataModelFetcher()
 
-        # Handle data input
+        if 'data' not in request.files:
+            return jsonify({
+                'status': 'error',
+                'message': 'No data file provided'
+            }), 400
+
         try:
-            if 'data' in request.files:
-                data_file = request.files['data']
-                X_train = data_fetcher.parse_data_file(data_file)
-            else:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'No data provided'
-                }), 400
+            # Get the data file
+            data_file = request.files['data']
+
+            # For CSV files, get column names before processing
+            feature_names = None
+            if data_file.filename.endswith('.csv'):
+                df = pd.read_csv(io.BytesIO(data_file.read()))
+                # Remove timestamp if present
+                if 'Timestamp' in df.columns:
+                    df = df.drop('Timestamp', axis=1)
+                feature_names = df.columns.tolist()
+                # Reset file pointer for parse_data_file
+                data_file.seek(0)
+
+            # Parse the data
+            X_train = data_fetcher.parse_data_file(data_file)
+
+            # If feature names weren't obtained from CSV, generate them
+            if not feature_names:
+                feature_names = [f'feature_{i}' for i in range(X_train.shape[1])]
 
             # Handle model input
             if 'model' in request.files:

@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import pickle
 import tempfile
 import traceback
 
@@ -9,57 +10,73 @@ import pandas as pd
 import requests
 import tensorflow as tf
 
+from backend.ModelWrapper import ModelWrapper
+
 
 class DataModelFetcher:
     def parse_data_file(self, file_data):
         """Parse data from uploaded file"""
         try:
             file_extension = file_data.filename.split('.')[-1].lower()
-            file_content = file_data.read()
-
             print(f"Processing file with extension: {file_extension}")
 
-            if file_extension == 'npy':
-                data = np.load(io.BytesIO(file_content))
-            elif file_extension == 'csv':
-                data = pd.read_csv(io.BytesIO(file_content)).to_numpy()
+            if file_extension == 'csv':
+                # Read CSV with pandas
+                df = pd.read_csv(io.BytesIO(file_data.read()))
+                print(f"CSV columns: {df.columns.tolist()}")
+
+                # Handle timestamp column if present
+                if 'Timestamp' in df.columns:
+                    df = df.drop('Timestamp', axis=1)
+
+                # Convert boolean columns to int
+                bool_columns = df.select_dtypes(include=['bool']).columns
+                for col in bool_columns:
+                    df[col] = df[col].astype(int)
+
+                # Ensure all data is numeric
+                numeric_df = df.select_dtypes(include=['float64', 'int64'])
+                if len(numeric_df.columns) != len(df.columns):
+                    non_numeric = set(df.columns) - set(numeric_df.columns)
+                    print(f"Dropped non-numeric columns: {non_numeric}")
+
+                # Convert to numpy array
+                data = numeric_df.to_numpy()
+
             elif file_extension == 'json':
-                json_data = json.loads(file_content.decode('utf-8'))
-
-                # Debug print
-                print("JSON data type:", type(json_data))
-                print("JSON data sample:", json_data[:5] if isinstance(json_data, list) else json_data)
-
-                # Handle different JSON structures
-                if isinstance(json_data, dict):
-                    if 'data' in json_data:
-                        data = np.array(json_data['data'])
-                    else:
-                        # If it's a dict without 'data' key, try to convert values
-                        data = np.array(list(json_data.values()))
-                elif isinstance(json_data, list):
-                    # If it's a list of lists, convert directly
-                    if json_data and isinstance(json_data[0], list):
-                        data = np.array(json_data)
-                    # If it's a list of dicts, convert to DataFrame first
-                    elif json_data and isinstance(json_data[0], dict):
-                        df = pd.DataFrame(json_data)
-                        data = df.to_numpy()
-                    else:
-                        data = np.array(json_data)
+                json_data = json.loads(file_data.read().decode('utf-8'))
+                if isinstance(json_data, dict) and 'data' in json_data:
+                    data = np.array(json_data['data'])
                 else:
-                    raise ValueError(f"Unsupported JSON structure")
+                    data = np.array(json_data)
+
+            elif file_extension == 'npy':
+                data = np.load(io.BytesIO(file_data.read()))
             else:
                 raise ValueError(f"Unsupported file format: {file_extension}")
+
+            # Validate and reshape data
+            if data is None or data.size == 0:
+                raise ValueError("Data is empty")
+
+            print(f"Data type: {type(data)}")
+            print(f"Data shape before processing: {data.shape}")
+
+            # Handle missing values
+            if np.isnan(data).any():
+                print("Found missing values, filling with mean")
+                # Fill missing values with mean of each column
+                for col in range(data.shape[1]):
+                    col_data = data[:, col]
+                    mean_val = np.nanmean(col_data)
+                    data[:, col] = np.where(np.isnan(col_data), mean_val, col_data)
 
             # Ensure data is 2D
             if data.ndim == 1:
                 data = data.reshape(-1, 1)
-            elif data.ndim > 2:
-                raise ValueError(f"Data has too many dimensions: {data.ndim}")
 
-            print(f"Parsed data shape: {data.shape}")
-            print(f"Data sample: {data[:2]}")  # Show first two rows
+            print(f"Final data shape: {data.shape}")
+            print(f"Sample data:\n{data[:2]}")
 
             return data
 
@@ -72,100 +89,67 @@ class DataModelFetcher:
         """Handle model from either file or URL"""
         try:
             if model_file:
-                with tempfile.NamedTemporaryFile(delete=False) as tmp:
-                    tmp.write(model_file.read())
-                    model_path = tmp.name
-            elif model_url:
-                response = requests.get(model_url)
-                with tempfile.NamedTemporaryFile(delete=False) as tmp:
-                    tmp.write(response.content)
-                    model_path = tmp.name
-            else:
-                raise ValueError("No model provided")
-
-            try:
-                model = tf.keras.models.load_model(model_path)
-                return model
-            finally:
-                if os.path.exists(model_path):
-                    os.unlink(model_path)
-
-        except Exception as e:
-            raise ValueError(f"Failed to load model: {str(e)}")
-
-    def parse_data_file(self, file_data):
-        """Parse data from uploaded file"""
-        try:
-            file_extension = file_data.filename.split('.')[-1].lower()
-            file_content = file_data.read()
-
-            print(f"Processing file with extension: {file_extension}")
-
-            if file_extension == 'npy':
-                data = np.load(io.BytesIO(file_content))
-            elif file_extension == 'csv':
-                data = pd.read_csv(io.BytesIO(file_content)).to_numpy()
-            elif file_extension == 'json':
-                data = json.loads(file_content.decode('utf-8'))
-                if isinstance(data, dict) and 'data' in data:
-                    data = data['data']
-                data = np.array(data)
-            else:
-                raise ValueError(f"Unsupported file format: {file_extension}")
-
-            # Ensure data is 2D
-            if len(data.shape) == 1:
-                data = data.reshape(-1, 1)
-
-            print(f"Parsed data shape: {data.shape}")
-            return data
-
-        except Exception as e:
-            print(f"Error parsing file: {str(e)}")
-            raise ValueError(f"Failed to parse file data: {str(e)}")
-
-    def handle_model(self, model_file=None, model_url=None):
-        """Handle model from either file or URL"""
-        try:
-            if model_file:
-                # Check file extension
                 file_extension = model_file.filename.split('.')[-1].lower()
-                if file_extension not in ['h5', 'keras']:
-                    raise ValueError(
-                        f"Unsupported model format: {file_extension}. Only .h5 and .keras files are supported.")
-
-                # Create temp file for uploaded model
                 with tempfile.NamedTemporaryFile(suffix=f'.{file_extension}', delete=False) as tmp:
                     tmp.write(model_file.read())
                     model_path = tmp.name
             elif model_url:
-                # Download model from URL
                 response = requests.get(model_url)
-                # Try to determine extension from URL
-                url_extension = model_url.split('.')[-1].lower()
-                if url_extension not in ['h5', 'keras']:
-                    raise ValueError(
-                        f"Unsupported model format: {url_extension}. Only .h5 and .keras files are supported.")
-
-                with tempfile.NamedTemporaryFile(suffix=f'.{url_extension}', delete=False) as tmp:
+                file_extension = model_url.split('.')[-1].lower()
+                with tempfile.NamedTemporaryFile(suffix=f'.{file_extension}', delete=False) as tmp:
                     tmp.write(response.content)
                     model_path = tmp.name
             else:
                 raise ValueError("No model provided")
 
             try:
-                # Load the model with custom object scope for better compatibility
-                with tf.keras.utils.custom_object_scope({}):
-                    model = tf.keras.models.load_model(
-                        model_path,
-                        compile=False  # Don't require optimizer/loss function
-                    )
-                return model
-            except Exception as e:
-                raise ValueError(f"Failed to load model: {str(e)}")
+                print(f"Loading model with extension: {file_extension}")
+
+                if file_extension == 'pkl':
+                    print("Loading pickle model")
+                    with open(model_path, 'rb') as f:
+                        original_model = pickle.load(f)
+                    print(f"Loaded model type: {type(original_model).__name__}")
+
+                    # Create wrapper
+                    model = ModelWrapper(original_model)
+
+                    # Test with minimal sample data
+                    try:
+                        print("\nTesting prediction...")
+                        # Create test data with exact dimensions
+                        n_samples = max(model.input_chunk_length, 48)
+
+                        # Create sample data with random values
+                        sample_data = np.random.rand(n_samples, model.n_features)
+                        # Scale to reasonable values (between 0 and 1)
+                        sample_data = (sample_data - sample_data.min()) / (sample_data.max() - sample_data.min())
+
+                        print(f"Test input shape: {sample_data.shape}")
+                        print("Testing prediction...")
+                        pred = model.predict(sample_data)
+                        print(f"Test prediction successful, shape: {pred.shape}")
+
+                    except Exception as e:
+                        print("Test prediction failed:")
+                        print(f"Error: {str(e)}")
+                        print(f"Traceback: {traceback.format_exc()}")
+                        raise
+                    return model
+
+                elif file_extension in ['h5', 'keras']:
+                    with tf.keras.utils.custom_object_scope({}):
+                        model = tf.keras.models.load_model(model_path, compile=False)
+                    return model
+                else:
+                    raise ValueError(f"Unsupported format: {file_extension}")
+
             finally:
-                # Clean up temp file
                 if os.path.exists(model_path):
                     os.unlink(model_path)
+                    print("Cleaned up temporary files")
+
         except Exception as e:
+            print(f"Error loading model: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
             raise ValueError(f"Failed to load model: {str(e)}")

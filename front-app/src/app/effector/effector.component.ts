@@ -77,8 +77,8 @@ export class EffectorComponent {
   selectedFile: FileData | null = null;
   selectedModel: FileData | null = null;
   dataSource: string = 'url';
-  dataAcceptTypes = '.json,.npy';
-  modelAcceptTypes = '.h5,.keras';
+  dataAcceptTypes = '.json,.npy,.csv';
+  modelAcceptTypes = '.h5,.keras,.pkl';
   config = {
     dataUrl: '',
     modelUrl: ''
@@ -119,7 +119,13 @@ export class EffectorComponent {
           file,
           type: 'npy'
         };
+      } else if (file.name.endsWith('.csv')) {
+        this.selectedFile = {
+          file,
+          type: 'csv'
+        };
       }
+      console.log('Selected file:', this.selectedFile);
     } catch (error) {
       console.error('Error reading file:', error);
     }
@@ -148,13 +154,18 @@ export class EffectorComponent {
 
   async analyze(): Promise<void> {
     this.loading = true;
+    this.plotImage = null;  // Clear previous results
+    this.partitioningInfo = null;
+
     try {
       const formData = new FormData();
 
       if (this.dataSource === 'file' && this.selectedFile) {
+        console.log('Sending file:', this.selectedFile);
         formData.append('data', this.selectedFile.file);
         formData.append('data_type', this.selectedFile.type);
       } else {
+        console.log('Sending URL:', this.config.dataUrl);
         formData.append('data_url', this.config.dataUrl);
       }
 
@@ -165,43 +176,53 @@ export class EffectorComponent {
         formData.append('model_url', this.config.modelUrl);
       }
 
-      // Add new parameters
       formData.append('method', this.selectedMethod);
       formData.append('feature_index', this.featureIndex.toString());
       formData.append('target_name', this.targetName);
       formData.append('node_idx', this.nodeIdx.toString());
       formData.append('heterogeneity', this.heterogeneity);
 
+      console.log('Sending request with method:', this.selectedMethod);
+
       const response = await this.http.post<EffectorResponse>(
         'http://localhost:5000/analyze',
         formData
       ).toPromise();
 
-      if (response && response.status === 'success') {
+      console.log('Received response:', response);
+
+      if (response && response.status === 'success' && response.results) {
+        // Store all results
         this.results = response.results;
 
-        // Set the appropriate plot based on the method
-        if (this.selectedMethod === 'pdp' && response.results.pdp_plot) {
-          this.plotImage = `data:image/png;base64,${response.results.pdp_plot}`;
-        } else if (this.selectedMethod === 'rhale' && response.results.rhale_plot) {
-          this.plotImage = `data:image/png;base64,${response.results.rhale_plot}`;
-        } else if (this.selectedMethod === 'regional_rhale' && response.results.regional_rhale_plot) {
-          this.plotImage = `data:image/png;base64,${response.results.regional_rhale_plot}`;
-        } else if (this.selectedMethod === 'regional_pdp' && response.results.regional_pdp_plot) {
-          this.plotImage = `data:image/png;base64,${response.results.regional_pdp_plot}`;
+        // Get the plot key based on method
+        const plotKey = `${this.selectedMethod}_plot` as keyof EffectorResponse['results'];
+        const plotData = response.results[plotKey];
+
+        if (plotData) {
+          console.log(`Found plot data for ${plotKey}`);
+          this.plotImage = `data:image/png;base64,${plotData}`;
+        } else {
+          console.warn(`No plot data found for ${plotKey}`);
         }
 
-        // Set partitioning info for regional methods
+        // Handle partitioning info
         if (['regional_rhale', 'regional_pdp'].includes(this.selectedMethod)) {
           this.partitioningInfo = response.results.partitioning_info || null;
-        } else {
-          this.partitioningInfo = null;
+          if (this.partitioningInfo) {
+            console.log('Received partitioning info');
+          }
         }
+      } else {
+        console.error('Invalid response:', response);
       }
     } catch (error) {
       console.error('Analysis failed:', error);
       if (error instanceof HttpErrorResponse) {
-        console.error('Server error:', error.error?.message || error.message);
+        const errorMessage = error.error?.message || error.message;
+        console.error('Server error:', errorMessage);
+        // You might want to show this error to the user
+        // Add error display in your template
       }
     } finally {
       this.loading = false;
